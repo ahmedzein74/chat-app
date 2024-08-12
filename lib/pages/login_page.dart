@@ -1,161 +1,140 @@
 import 'package:chat_app/constant.dart';
 import 'package:chat_app/helper/show_snack_bar.dart';
+import 'package:chat_app/pages/blocs/auth_bloc/auth_bloc.dart';
 import 'package:chat_app/pages/chat_page.dart';
+// import 'package:chat_app/pages/cubits/auth_cubit/auth_cubit.dart';
+import 'package:chat_app/pages/cubits/chat_cubit/chat_cubit.dart';
 import 'package:chat_app/pages/register_page.dart';
 import 'package:chat_app/widget/custom_button.dart';
 import 'package:chat_app/widget/custom_text_field.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:modal_progress_hud_nsn/modal_progress_hud_nsn.dart';
 
-class LoginPage extends StatefulWidget {
+class LoginPage extends StatelessWidget {
   LoginPage({super.key});
-
-  // Making this a static field so it can be accessed using the class name, not an object instance.
-  static String id = 'LoginPage';
-
-  @override
-  State<LoginPage> createState() => _LoginPageState();
-}
-
-class _LoginPageState extends State<LoginPage> {
   // Form key to manage form state and validate input.
   GlobalKey<FormState> formKey = GlobalKey();
 
   // Variables to manage loading state and user input.
   bool isLoading = false;
   String? email, password;
+  static String id = 'LoginPage';
 
   @override
   Widget build(BuildContext context) {
-    return ModalProgressHUD(
-      // Show a loading indicator when isLoading is true.
-      inAsyncCall: isLoading,
-      child: Scaffold(
-        backgroundColor: kPrimaryColor,
-        body: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Form(
-            key: formKey,
-            child: ListView(
-              children: [
-                const SizedBox(
-                  height: 100,
-                ),
-                // Displaying the logo.
-                Center(child: Image.asset('assets/images/scholar.png')),
-                // App title.
-                const Center(
-                  child: Text(
-                    'Scholar Chat',
-                    style: TextStyle(
-                        fontSize: 24,
-                        color: Colors.white,
-                        fontFamily: 'pacifico'),
-                  ),
-                ),
-                // Login header.
-                const Row(
+    return BlocConsumer<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is LoginLoading) {
+          isLoading = true;
+        } else if (state is LoginSuccess) {
+          BlocProvider.of<ChatCubit>(context).getMessage();
+          Navigator.pushNamed(context, ChatPage.id, arguments: email);
+          isLoading = false;
+        } else if (state is LoginFailure) {
+          showSnackBar(context, state.errMessage);
+          isLoading = false;
+        }
+      },
+      builder: (context, state) {
+        return ModalProgressHUD(
+          // Show a loading indicator when isLoading is true.
+          inAsyncCall: isLoading,
+          child: Scaffold(
+            backgroundColor: kPrimaryColor,
+            body: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Form(
+                key: formKey,
+                child: ListView(
                   children: [
-                    Text('LOGIN',
-                        style: TextStyle(
-                          fontSize: 24,
-                          color: Colors.white,
-                        )),
-                  ],
-                ),
-                const SizedBox(
-                  height: 20,
-                ),
-                // Custom text field for email input.
-                CustomTextFormField(
-                  onChanged: (data) {
-                    email = data;
-                  },
-                  hintText: 'Email',
-                ),
-                const SizedBox(
-                  height: 20,
-                ),
-                // Custom text field for password input, with obscure text.
-                CustomTextFormField(
-                  obscureText: true,
-                  onChanged: (data) {
-                    password = data;
-                  },
-                  hintText: 'password',
-                ),
-                const SizedBox(
-                  height: 30,
-                ),
-                // Custom button for login action.
-                CustomButton(
-                  onTap: () async {
-                    if (formKey.currentState!.validate()) {
-                      // Show loading indicator.
-                      isLoading = true;
-                      setState(() {});
-
-                      try {
-                        // Attempt to log in the user.
-                        await loginUser();
-                        // Navigate to the chat page on success.
-                        Navigator.pushNamed(context, ChatPage.id,
-                            arguments: email);
-                      } on FirebaseAuthException catch (ex) {
-                        // Show appropriate error message if login fails.
-                        if (ex.code == 'user-not-found') {
-                          showSnackBar(
-                              context, 'No user found for that email.');
-                        } else if (ex.code == 'wrong-password') {
-                          showSnackBar(context,
-                              'Wrong password provided for that user.');
-                        }
-                      } catch (ex) {
-                        // Show generic error message for other exceptions.
-                        showSnackBar(context, 'There was an error');
-                      }
-                      // Hide loading indicator.
-                      isLoading = false;
-                      setState(() {});
-                    } else {
-                      // Handle form validation failure if needed.
-                    }
-                  },
-                  text: 'LOGIN',
-                ),
-                const SizedBox(height: 20),
-                // Link to the register page.
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'don\'t have an account ?',
-                      style: TextStyle(color: Colors.white, fontSize: 20),
+                    const SizedBox(
+                      height: 100,
                     ),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pushNamed(context, RegisterPage.id);
-                      },
-                      child: const Text(
-                        'Register Now',
-                        style: TextStyle(color: Colors.grey, fontSize: 24),
+                    // Displaying the logo.
+                    Center(child: Image.asset('assets/images/scholar.png')),
+                    // App title.
+                    const Center(
+                      child: Text(
+                        'Scholar Chat',
+                        style: TextStyle(
+                            fontSize: 24,
+                            color: Colors.white,
+                            fontFamily: 'pacifico'),
                       ),
+                    ),
+                    // Login header.
+                    const Row(
+                      children: [
+                        Text('LOGIN',
+                            style: TextStyle(
+                              fontSize: 24,
+                              color: Colors.white,
+                            )),
+                      ],
+                    ),
+                    const SizedBox(
+                      height: 20,
+                    ),
+                    // Custom text field for email input.
+                    CustomTextFormField(
+                      onChanged: (data) {
+                        email = data;
+                      },
+                      hintText: 'Email',
+                    ),
+                    const SizedBox(
+                      height: 20,
+                    ),
+                    // Custom text field for password input, with obscure text.
+                    CustomTextFormField(
+                      obscureText: true,
+                      onChanged: (data) {
+                        password = data;
+                      },
+                      hintText: 'password',
+                    ),
+                    const SizedBox(
+                      height: 30,
+                    ),
+                    // Custom button for login action.
+                    CustomButton(
+                      onTap: () async {
+                        if (formKey.currentState!.validate()) {
+                          BlocProvider.of<AuthBloc>(context).add(
+                              LoginEvent(email: email!, password: password!));
+                        } else {}
+                      },
+                      text: 'LOGIN',
+                    ),
+                    const SizedBox(height: 20),
+                    // Link to the register page.
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'don\'t have an account ?',
+                          style: TextStyle(color: Colors.white, fontSize: 20),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pushNamed(context, RegisterPage.id);
+                          },
+                          child: const Text(
+                            'Register Now',
+                            style: TextStyle(color: Colors.grey, fontSize: 24),
+                          ),
+                        )
+                      ],
                     )
                   ],
-                )
-              ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
-  }
-
-  // Method to log in the user with email and password.
-  Future<void> loginUser() async {
-    UserCredential userCredential = await FirebaseAuth.instance
-        .signInWithEmailAndPassword(email: email!, password: password!);
   }
 }
 

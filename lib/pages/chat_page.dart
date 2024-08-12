@@ -1,18 +1,15 @@
 import 'package:chat_app/constant.dart';
 import 'package:chat_app/models/message_model.dart';
+import 'package:chat_app/pages/cubits/chat_cubit/chat_cubit.dart';
 import 'package:chat_app/widget/chat_buble.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class ChatPage extends StatelessWidget {
   static String id = 'chatPage';
 
-  // Access the messages collection in Firestore. If it doesn't exist, it will be created.
-  CollectionReference messages =
-      FirebaseFirestore.instance.collection(KMessagesCollections);
-
-  // Controller to manage the text field input.
   TextEditingController controller = TextEditingController();
+  List<Message> messageList = [];
 
   // Controller to manage the scrolling of the ListView.
   final ScrollController scrollController = ScrollController();
@@ -20,7 +17,6 @@ class ChatPage extends StatelessWidget {
   // Function to scroll to the end of the ListView.
   void scrollToEnd() {
     scrollController.jumpTo(
-      // scrollController.position.maxScrollExtent, // Commented out to prevent error
       0,
     );
   }
@@ -28,115 +24,93 @@ class ChatPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Get the email passed as an argument to the ChatPage.
-    var email = ModalRoute.of(context)!.settings.arguments;
-
-    // Function to send a message and scroll to the end.
-    void sendMessage() {
-      if (controller.text.isNotEmpty) {
-        messages.add(
-          {
-            KMessage: controller.text,
-            KCreatedAt: DateTime.now(),
-            'id': email,
-          },
-        );
-        controller.clear();
-        scrollToEnd();
-      }
+    var email = ModalRoute.of(context)!.settings.arguments as String;
+    void sendMessage({required String data, required String email}) {
+      BlocProvider.of<ChatCubit>(context)
+          .sendMessage(message: data, email: email);
+      controller.clear();
+      scrollToEnd();
     }
 
-    // StreamBuilder to listen for real-time updates from Firestore.
-    return StreamBuilder<QuerySnapshot>(
-      // Fetch data ordered by creation time in descending order.
-      stream: messages.orderBy(KCreatedAt, descending: true).snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          // List to hold messages.
-          List<Message> listMessage = [];
-
-          // Loop through the documents and create Message objects.
-          for (var i = 0; i < snapshot.data!.docs.length; i++) {
-            listMessage.add(Message.fromjson(snapshot.data!.docs[i]));
-          }
-
-          return Scaffold(
-            appBar: AppBar(
-              automaticallyImplyLeading: false,
-              backgroundColor: kPrimaryColor,
-              centerTitle: true,
-              title: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset(
-                    'assets/images/scholar.png',
-                    height: 60,
-                  ),
-                  const Text(
-                    'Chat',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ],
+    return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: kPrimaryColor,
+        centerTitle: true,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/images/scholar.png',
+              height: 60,
+            ),
+            const Text(
+              'Chat',
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: BlocConsumer<ChatCubit, ChatState>(
+              listener: (context, state) {
+                if (state is ChatSuccess) {
+                  messageList = state.messageList;
+                }
+              },
+              builder: (context, state) {
+                return ListView.builder(
+                  reverse: true,
+                  controller: scrollController,
+                  itemCount: messageList.length,
+                  itemBuilder: (context, index) {
+                    // Display different chat bubbles based on the message sender.
+                    return messageList[index].id == email
+                        ? ChatBuble(
+                            message: messageList[index],
+                          )
+                        : ChatBubleForFrind(
+                            message: messageList[index],
+                          );
+                  },
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(11.0),
+            child: TextField(
+              controller: controller,
+              onSubmitted: (data) {
+                sendMessage(data: data, email: email);
+              },
+              decoration: InputDecoration(
+                hintText: 'Send Message',
+                hintStyle: const TextStyle(color: kPrimaryColor),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.send),
+                  color: kPrimaryColor,
+                  onPressed: () {
+                    if (controller.text.isNotEmpty) {
+                      sendMessage(data: controller.text, email: email);
+                    }
+                  },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: kPrimaryColor),
+                ),
               ),
             ),
-            body: Column(
-              children: [
-                // Expanded widget to allow the ListView to take up available space.
-                Expanded(
-                  child: ListView.builder(
-                    reverse: true,
-                    controller: scrollController,
-                    itemCount: listMessage.length,
-                    itemBuilder: (context, index) {
-                      // Display different chat bubbles based on the message sender.
-                      return listMessage[index].id == email
-                          ? ChatBuble(
-                              message: listMessage[index],
-                            )
-                          : ChatBubleForFrind(
-                              message: listMessage[index],
-                            );
-                    },
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(11.0),
-                  child: TextField(
-                    controller: controller,
-                    // Send the message when the user submits the text.
-                    onSubmitted: (data) {
-                      sendMessage();
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Send Message',
-                      hintStyle: const TextStyle(color: kPrimaryColor),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.send),
-                        color: kPrimaryColor,
-                        onPressed: sendMessage,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(color: kPrimaryColor),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        } else {
-          // Show a loading indicator if data is not available.
-          return const Center(
-            child: CircularProgressIndicator(
-              color: Colors.white,
-              backgroundColor: kPrimaryColor,
-            ),
-          );
-        }
-      },
+          ),
+        ],
+      ),
     );
   }
 }
+
 
 
 // Explanation:
